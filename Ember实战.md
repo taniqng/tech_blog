@@ -1,1 +1,1 @@
-#关于Ember
+# dis-eventbus
