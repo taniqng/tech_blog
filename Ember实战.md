@@ -21,10 +21,73 @@ npm install -g ember-cli
 ```
 ember new tech-navi
 ```
+
+### 集成bootstrap
+```
+#集成bootstrap
+ember install ember-bootstrap
+```
+
+好了，我们可以直接在template里使用bootstrap样式了。
+
 ### 创建一个路由
 ```
 ember g route projects 
 ```
-#### 请求数据流
-graph LR
-   Request --> Route  --> Controller --> Tempates（VIEW）
+会生成如下代码：
+```
+1
+```
+#### 请求数据流（Ember三个核心概念）
+Ember三个核心角色分别是，Route、Controller、Template。
+* Tempalte就是我们的VIEW层（html模板），在这里布局，画html。
+* Controller是Template的上下文，我们可以在template里使用Controller里的所有数据
+* Route负责准备Controller里的数据（对后端的ajax请求一定要写在这里）。
+
+ Request --> Route  --> Controller --> Tempates（VIEW）
+ 
+ Ember会自动按照下面的命名规范创建Router， Controller（即使你不创建）
+
+### Model
+   model是一个业务对象的抽象，一般对应后台的一个model。
+```
+ember g model project
+```
+上面代码会自动生成如下代码，我们可以定义model的fields。
+```
+2
+```
+
+### 在Route里加载数据
+刚才提到了，route负责加载数据，一般而言都是会调用后台的rest服务。
+route的model hook里调用this.store.findAll("project");这会调用后台的[GET] http://domain/projects
+```
+3
+```
+model hook返回一个promise，当promise数据加载完成会将实际的数据set到与之对应的controller里。
+### 在Controller里准备要展示的数据
+```
+4
+```
+### 在Template布局页面和展示数据
+```
+5
+```
+如果我们想把搜索到的关键字红色字体展示，可以写一个helper
+```
+ember g helper mark-keywords
+```
+生成如下代码，我们完成红色字体的处理逻辑
+```
+#helper
+```
+在template里使用helper
+```
+6
+```
+
+
+# 后记
+Ember或许不是最合适的前端MVC框架，但
+
+ 
