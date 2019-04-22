@@ -38,7 +38,41 @@ ember g route projects
 ```
 会生成如下代码：
 ```
-1
+#router.js
+import EmberRouter from '@ember/routing/router';
+import config from './config/environment';
+
+const Router = EmberRouter.extend({
+  location: config.locationType,
+  rootURL: config.rootURL
+});
+
+Router.map(function() {
+  this.route('departments', function() {
+    this.route('department',{ path: '/:department_id' });
+  });
+  this.route('projects', function() {
+    this.route('project', { path: '/:project_id' });
+  });
+});
+
+export default Router;
+
+
+#projects.js routes
+import Route from '@ember/routing/route';
+
+export default Route.extend({
+    
+    queryParams: {
+        departmentId: {
+          refreshModel: true
+        }
+      },
+    model: function(args){
+        return this.store.findAll("project");
+    }
+});
 ```
 #### 请求数据流（Ember三个核心概念）
 Ember三个核心角色分别是，Route、Controller、Template。
@@ -57,23 +91,155 @@ ember g model project
 ```
 上面代码会自动生成如下代码，我们可以定义model的fields。
 ```
-2
+import DS from 'ember-data';
+
+export default DS.Model.extend({
+
+    projectName: DS.attr('string'),
+    projectLogo: DS.attr('string'),
+    projectEnName: DS.attr('string'),
+    projectLink: DS.attr('string'),
+    projectWikiLink: DS.attr('string'),
+    owner: DS.attr('string'),
+    others: DS.attr('string'),
+    ownerAvatar: DS.attr('string'),
+    deptId:DS.attr('string'),
+    desc:DS.attr('string'),
+    status:DS.attr('string')
+
+});
 ```
 
 ### 在Route里加载数据
 刚才提到了，route负责加载数据，一般而言都是会调用后台的rest服务。
 route的model hook里调用this.store.findAll("project");这会调用后台的[GET] http://domain/projects
 ```
-3
+import Route from '@ember/routing/route';
+
+export default Route.extend({
+    
+    queryParams: {
+        departmentId: {
+          refreshModel: true
+        }
+      },
+    model: function(args){
+        return this.store.findAll("project");
+    }
+});
 ```
 model hook返回一个promise，当promise数据加载完成会将实际的数据set到与之对应的controller里。
 ### 在Controller里准备要展示的数据
 ```
-4
+#描述的是一个部门department所维护的工程（projects）列表。
+import Controller from '@ember/controller';
+import { computed } from '@ember/object';
+
+export default Controller.extend({
+    queryParams: ['departmentId'],
+    departmentId: null,
+    keywords:"",
+    
+    #根据部门过滤projects
+    projects: computed('model', function() {
+
+      let projs = this.get('model');
+      let thiz = this;
+      let deptId = thiz.get('departmentId') || "";
+      let projsForThisDept = projs.filter(function(value){
+          return value.get('deptId').startsWith(deptId);
+      });
+      return projsForThisDept;
+      
+    }),
+    
+    #忽略大小写过滤某关键字，filteredProjects可以在template中直接使用，注意该变量会双向绑定到template
+    filteredProjects: computed('projects','keywords', function() {
+
+      let projs = this.get('projects');
+      let keywords = this.get('keywords');
+      let filteredProjs = projs.filter(function(value){
+        let pname = value.get('projectName');
+        let ename = value.get('projectEnName');
+        let desc = value.get('desc');
+
+        let isHit = pname&&pname.toLowerCase().indexOf(keywords.toLowerCase())!=-1
+              || ename&&ename.toLowerCase().indexOf(keywords.toLowerCase())!=-1
+              || desc&&desc.toLowerCase().indexOf(keywords.toLowerCase())!=-1;
+        return isHit;
+      });
+      return filteredProjs.sortBy('owner','projectName','projectEnName');
+      
+    })
+});
+
 ```
 ### 在Template布局页面和展示数据
 ```
-5
+<div class="panel panel-default">
+  <!-- Default panel contents -->
+  <div class="panel-heading"><b>项目列表</b> {{#if departmentId}}( {{dept-helper departmentId}} ) {{/if}}<a href="#"><span class="badge">{{filteredProjects.length}}</span></a></div>
+  <div class="panel-body">
+    <div class="input-group">
+        <span class="input-group-addon">搜索</span>
+        {{input type="text" value=this.keywords class="form-control" placeholder="请输入关键字..."}}
+        
+        {{#if keywords}}
+        <span class="input-group-addon">keywords: "{{this.keywords}}"</span>
+        
+        {{/if}}
+    </div>
+  </div>
+
+  <!-- Table -->
+  <table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col" width="10%"><b>项目昵称</b></th>
+      <th scope="col" width="10%"><b>项目名</b></th>
+      <th scope="col" width="20%"><b>描述</b></th>
+      <th scope="col" width="8%"><b>负责人</b></th>
+      <th scope="col" width="10%"><b>状态</b></th>
+      <th scope="col" width="10%"><b>link</b></th>
+      <th scope="col" width="20%"><b>文档</b></th>
+      <th scope="col" width="12%"><b>操作</b></th>
+    </tr>
+  </thead>
+  <tbody>
+    
+        {{#each this.filteredProjects as |proj index|}}
+            <tr>
+            <td>{{proj.projectEnName}}</td>
+            <td>{{projectName}}</td>
+            <td>{{proj.desc}}</td>
+            <td>{{proj.owner}}</td>
+            <td>{{proj.status}}</td>
+            <td><a href="{{proj.projectLink}}" target="_blank">{{proj.projectLink}}</a></td>
+            <td><a href="{{proj.projectWikiLink}}" target="_blank">{{proj.projectWikiLink}}</a></td>
+            <td>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-success btn-sm">Action</button>
+                    <button type="button" class="btn btn-success dropdown-toggle btn-sm" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <span class="caret"></span>
+                        <span class="sr-only">Toggle Dropdown</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#">Action</a></li>
+                        <li><a href="#">Another action</a></li>
+                        <li><a href="#">Something else here</a></li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#">Separated link</a></li>
+                    </ul>
+                </div>
+            </td>
+            </tr>
+        {{/each}}
+    
+  </tbody>
+</table>
+</div>
+
+{{outlet}}
 ```
 如果我们想把搜索到的关键字红色字体展示，可以写一个helper
 ```
@@ -85,7 +251,70 @@ ember g helper mark-keywords
 ```
 在template里使用helper
 ```
-6
+<div class="panel panel-default">
+  <!-- Default panel contents -->
+  <div class="panel-heading"><b>项目列表</b> {{#if departmentId}}( {{dept-helper departmentId}} ) {{/if}}<a href="#"><span class="badge">{{filteredProjects.length}}</span></a></div>
+  <div class="panel-body">
+    <div class="input-group">
+        <span class="input-group-addon">搜索</span>
+        {{input type="text" value=this.keywords class="form-control" placeholder="请输入关键字..."}}
+        
+        {{#if keywords}}
+        <span class="input-group-addon">keywords: "{{this.keywords}}"</span>
+        
+        {{/if}}
+    </div>
+  </div>
+
+  <!-- Table -->
+  <table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col" width="10%"><b>项目昵称</b></th>
+      <th scope="col" width="10%"><b>项目名</b></th>
+      <th scope="col" width="20%"><b>描述</b></th>
+      <th scope="col" width="8%"><b>负责人</b></th>
+      <th scope="col" width="10%"><b>状态</b></th>
+      <th scope="col" width="10%"><b>link</b></th>
+      <th scope="col" width="20%"><b>文档</b></th>
+      <th scope="col" width="12%"><b>操作</b></th>
+    </tr>
+  </thead>
+  <tbody>
+    
+        {{#each this.filteredProjects as |proj index|}}
+            <tr>
+            <td>{{mark-keywords proj.projectEnName keywords}}</td>
+            <td>{{mark-keywords proj.projectName keywords}}</td>
+            <td>{{mark-keywords proj.desc keywords}}</td>
+            <td>{{proj.owner}}</td>
+            <td>{{proj.status}}</td>
+            <td><a href="{{proj.projectLink}}" target="_blank">{{proj.projectLink}}</a></td>
+            <td><a href="{{proj.projectWikiLink}}" target="_blank">{{proj.projectWikiLink}}</a></td>
+            <td>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-success btn-sm">Action</button>
+                    <button type="button" class="btn btn-success dropdown-toggle btn-sm" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <span class="caret"></span>
+                        <span class="sr-only">Toggle Dropdown</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#">Action</a></li>
+                        <li><a href="#">Another action</a></li>
+                        <li><a href="#">Something else here</a></li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#">Separated link</a></li>
+                    </ul>
+                </div>
+            </td>
+            </tr>
+        {{/each}}
+    
+  </tbody>
+</table>
+</div>
+
+{{outlet}}
 ```
 
 
